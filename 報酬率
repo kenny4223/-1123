@@ -1,11 +1,12 @@
 import yfinance as yf
 import pandas as pd
 
-# 獲取微軟股票的歷史數據
-msft = yf.Ticker("2330.TW")
-hist = msft.history(period="1y")
+# 獲取台積電股票的歷史數據
+#a = "2330.TW"
+msft = yf.Ticker(input("請輸入股票代號(例如:想找台積電請輸入 2330.TW): "))
+hist = msft.history(period="3mo")
 
-# 計算微軟股票的布林通道
+# 計算台積電股票的布林通道
 sma20 = hist["Close"].rolling(window=20).mean()
 std20 = hist["Close"].rolling(window=20).std()
 upper_band = sma20 + 2 * std20

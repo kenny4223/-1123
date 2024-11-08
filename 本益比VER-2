@@ -1,0 +1,70 @@
+import requests
+from io import StringIO
+import pandas as pd
+import yfinance as yf
+
+# 使用者輸入日期和證券代號
+datestr = input("請輸入查詢日期 (格式：YYYYMMDD，例如：20180131)：")
+stock_id = input("請輸入股票代號 (例如：2330.TW): ")
+simple_stock_id = stock_id.split(".")[0]  # 提取證券代號的前半部分，用於查詢本益比
+
+# 下載台灣證券交易所的股票資料以獲取本益比
+url = f'https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date={datestr}&type=ALL'
+r = requests.post(url)
+
+# 整理資料為 DataFrame
+df = pd.read_csv(StringIO(r.text.replace("=", "")), 
+                 header=["證券代號" in l for l in r.text.split("\n")].index(True) - 1)
+df = df.dropna(how='all', axis=1)
+df.columns = [col.strip() for col in df.columns]  # 去除欄位名稱中的空白
+df = df.apply(lambda s: pd.to_numeric(s.astype(str).str.replace(",", ""), errors='coerce'))
+
+# 篩選指定的證券代號
+stock_data = df[df['證券代號'] == int(simple_stock_id)]
+
+# 獲取本益比並顯示
+if not stock_data.empty:
+    pe_ratio = stock_data.iloc[0]['本益比']  # 假設"本益比"欄位名稱為「本益比」
+    print(f"{simple_stock_id} 的本益比為：{pe_ratio}")
+else:
+    print("找不到該證券代號的資料，請確認日期和代號是否正確。")
+
+# 使用 yfinance 獲取股票的近期數據
+msft = yf.Ticker(stock_id)
+hist = msft.history(period="3mo")
+
+# 計算布林通道
+sma20 = hist["Close"].rolling(window=20).mean()
+std20 = hist["Close"].rolling(window=20).std()
+upper_band = sma20 + 2 * std20
+lower_band = sma20 - 2 * std20
+
+balance_history = {}
+
+# 計算策略的報酬率
+balance = 10000  # 初始資金
+balance2 = 10000
+stock = 0  # 持有股票數量
+for i in range(len(hist)):
+    if hist["Close"].iloc[i] > upper_band.iloc[i] and stock == 0:
+        # 買入股票
+        stock = balance // hist["Close"].iloc[i]
+        balance -= stock * hist["Close"].iloc[i]
+    elif hist["Close"].iloc[i] < lower_band.iloc[i] and stock > 0:
+        # 賣出股票
+        balance += stock * hist["Close"].iloc[i]
+        stock = 0
+    
+    balance_history[hist.index[i]] = (balance + stock * hist['Close'].iloc[i])
+
+# 計算最終的報酬率
+final_value = balance + stock * hist["Close"].iloc[-1]
+return_rate = (final_value - balance2) / balance2
+print("投資策略的最終報酬率：%.2f%%" % (return_rate * 100))
+
+# 顯示當日的投資報酬率
+if len(hist) > 1:
+    day_return_rate = ((hist["Close"].iloc[-1] - hist["Close"].iloc[-2]) / hist["Close"].iloc[-2]) * 100
+    print(f"{simple_stock_id} 的當日投資報酬率為：{day_return_rate:.2f}%")
+else:
+    print("無法計算當日的投資報酬率，因為缺少足夠的歷史數據。")

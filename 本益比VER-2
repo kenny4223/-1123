@@ -31,7 +31,7 @@ else:
 
 # 使用 yfinance 獲取股票的近期數據
 msft = yf.Ticker(stock_id)
-hist = msft.history(period="3mo")
+hist = msft.history(period="6mo")
 
 # 計算布林通道
 sma20 = hist["Close"].rolling(window=20).mean()
@@ -60,7 +60,7 @@ for i in range(len(hist)):
 # 計算最終的報酬率
 final_value = balance + stock * hist["Close"].iloc[-1]
 return_rate = (final_value - balance2) / balance2
-print("投資策略的最終報酬率：%.2f%%" % (return_rate * 100))
+print("6個月內投資策略(布林通道)的最終報酬率：%.2f%%" % (return_rate * 100))
 
 # 顯示當日的投資報酬率
 if len(hist) > 1:

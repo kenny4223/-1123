@@ -1,0 +1,18 @@
+import yfinance as yf
+
+# 使用者輸入股票代碼和日期範圍
+stock_code = input("請輸入股票代號 (例如：2330.TW): ")
+start_date = input("請輸入開始日期 (格式：YYYY-MM-DD，例如：2024-11-05): ")
+end_date = input("請輸入結束日期 (格式：YYYY-MM-DD，例如：2024-11-08): ")
+
+# 下載股票的歷史數據
+stock = yf.Ticker(stock_code)
+df = stock.history(start=start_date, end=end_date)
+
+# 顯示股票名稱與代號
+stock_name = stock.info.get('longName', '未知名稱')
+print(f"股票名稱: {stock_name}")
+print(f"股票代號: {stock_code}")
+
+# 顯示數據
+df

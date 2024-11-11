@@ -1,0 +1,5 @@
+import pandas as pd
+url = 'https://tchinfo.ttu.edu.tw/tchinfo.php?id=slhsieh'
+table = pd.read_html(url)[3]
+table.to_excel("text.xlsx") #放入excel
+print (table)

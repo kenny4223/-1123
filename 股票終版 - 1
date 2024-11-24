@@ -1,0 +1,76 @@
+import yfinance as yf
+import requests
+from io import StringIO
+import pandas as pd
+
+# 使用者輸入股票代碼和日期範圍
+stock_code = input("請輸入股票代號 (例如：2330.TW): ")
+start_date = input("請輸入開始日期 (格式：YYYY-MM-DD，例如：2024-11-05): ")
+end_date = input("請輸入結束日期 (格式：YYYY-MM-DD，例如：2024-11-08): ")
+datestr = start_date.replace("-", "")  # 將開始日期格式轉換為YYYYMMDD，用於本益比查詢
+simple_stock_id = stock_code.split(".")[0]  # 提取證券代號的前半部分，用於本益比查詢
+
+# 下載股票的歷史數據
+stock = yf.Ticker(stock_code)
+df = stock.history(start=start_date, end=end_date)
+
+
+# 顯示股票名稱與代號
+stock_name = stock.info.get('longName', '未知名稱')
+print(f"\n股票名稱: {stock_name}\n")
+print(f"股票代號: {stock_code}\n")
+print(df)
+
+# 查詢本益比
+url = f'https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date={datestr}&type=ALL'
+try:
+    response = requests.get(url)
+    response.raise_for_status()  # 檢查是否成功取得資料
+    df_pe = pd.read_csv(StringIO(response.text.replace("=", "")), 
+                        header=["證券代號" in l for l in response.text.split("\n")].index(True) - 1)
+    df_pe = df_pe.dropna(how='all', axis=1)
+    df_pe.columns = [col.strip() for col in df_pe.columns]
+    df_pe = df_pe.apply(lambda s: pd.to_numeric(s.astype(str).str.replace(",", ""), errors='coerce'))
+    stock_data = df_pe[df_pe['證券代號'] == int(simple_stock_id)]
+    
+    if not stock_data.empty:
+        pe_ratio = stock_data.iloc[0]['本益比'] 
+        print(f"\n{stock_name} 的本益比為: {pe_ratio}\n")
+    else:
+        print("找不到該證券代號的資料，請確認日期和代號是否正確。\n")
+
+except requests.exceptions.RequestException as e:
+    print("無法取得本益比資料。請檢查網路連線或日期範圍。\n")
+    print(e)
+
+# 使用 yfinance 獲取股票的近期數據
+hist = stock.history(period="6mo")
+
+# 計算布林通道
+sma20 = hist["Close"].rolling(window=20).mean()
+std20 = hist["Close"].rolling(window=20).std()
+upper_band = sma20 + 2 * std20
+lower_band = sma20 - 2 * std20
+
+# 布林通道策略模擬
+balance = 10000  # 初始資金
+balance2 = 10000
+stock_qty = 0  # 持有股票數量
+balance_history = {}
+
+for i in range(len(hist)):
+    if hist["Close"].iloc[i] > upper_band.iloc[i] and stock_qty == 0:
+        # 買入股票
+        stock_qty = balance // hist["Close"].iloc[i]
+        balance -= stock_qty * hist["Close"].iloc[i]
+    elif hist["Close"].iloc[i] < lower_band.iloc[i] and stock_qty > 0:
+        # 賣出股票
+        balance += stock_qty * hist["Close"].iloc[i]
+        stock_qty = 0
+    
+    balance_history[hist.index[i]] = (balance + stock_qty * hist['Close'].iloc[i])
+
+# 計算最終的報酬率
+final_value = balance + stock_qty * hist["Close"].iloc[-1]
+return_rate = (final_value - balance2) / balance2
+print("6個月內投資策略(布林通道)的最終報酬率: %.2f%%" % (return_rate * 100))

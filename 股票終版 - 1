@@ -14,6 +14,8 @@ simple_stock_id = stock_code.split(".")[0]  # 提取證券代號的前半部分�
 stock = yf.Ticker(stock_code)
 df = stock.history(start=start_date, end=end_date)
 
+# 移除 Dividends 和 Stock Splits 列
+df = df.drop(columns=["Dividends", "Stock Splits"], errors="ignore")
 
 # 顯示股票名稱與代號
 stock_name = stock.info.get('longName', '未知名稱')
@@ -45,6 +47,9 @@ except requests.exceptions.RequestException as e:
 
 # 使用 yfinance 獲取股票的近期數據
 hist = stock.history(period="6mo")
+
+# 移除 Dividends 和 Stock Splits 列
+hist = hist.drop(columns=["Dividends", "Stock Splits"], errors="ignore")
 
 # 計算布林通道
 sma20 = hist["Close"].rolling(window=20).mean()
